@@ -39,6 +39,32 @@ cannot articulate a genuine shift, the video has no payload.
 - The title must not promise more than the evidence supports. Be ambitious in
   framing and honest in scope.
 
+### THE SCOPE TEST — APPLY IT TO EVERY TITLE BEFORE YOU SUBMIT
+
+This is the single most common way these candidates fail. In the first live
+run, EVERY finalist was judged fatally over-broad on exactly this point.
+
+Before writing a title, name the evidence you actually have. Then ask: **does
+the title claim something wider than that evidence?**
+
+- Evidence is one benchmark on file-review agents
+  -> "When AI Claims a Job Is Done, How Do We Know It Did the Work?" claims all
+     AI work. TOO BROAD.
+- Evidence is one company's post-trained model plus one paper
+  -> "Why AI companies now want their models to think less" claims an industry
+     consensus. TOO BROAD.
+- Evidence is one study of diminishing returns
+  -> "Is thinking longer the only way left to improve AI?" claims a field-wide
+     survey. TOO BROAD.
+
+The fix is NOT to retreat into jargon or into a news headline about one
+company. It is to find the honest question at the size of the evidence, still
+phrased for someone outside the field. A narrower true question beats a broader
+one you cannot defend, and the red team will find the gap if you do not.
+
+State the scope honestly in `strongest_counterargument` as well -- if the
+evidence is one benchmark, say so there.
+
 ## ALSO REQUIRED
 
 - `credible_disagreement`: a real dispute from the sources, with real sides.

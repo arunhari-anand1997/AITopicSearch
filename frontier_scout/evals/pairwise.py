@@ -99,7 +99,12 @@ class PairwiseTournament:
             schema=PairwiseOutput,
             prompt_version=prompt_version(self.prompt_name),
             effort=self.runner.provider.effort_for(self.role),
-            max_tokens=2000,
+            # Generous despite the tiny schema: a verbose model that overruns
+            # the limit returns finish_reason=length with NO usable JSON, and
+            # a lost judgement is far more expensive than unused headroom.
+            # On the first live tournament 24 of 270 judgements died this way
+            # at max_tokens=2000.
+            max_tokens=8000,
             metadata={"role": self.role, "question": question_key},
         )
         out: PairwiseOutput | None = await self.runner.run(request)

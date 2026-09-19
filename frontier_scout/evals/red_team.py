@@ -109,9 +109,19 @@ class RedTeam:
             f"=== RED TEAM FINDINGS ===\n{attack_text}\n\n"
             "You may revise ONLY the title, central question and premise, to make "
             "the promise match the evidence. Do NOT invent new evidence, and do "
-            "NOT soften the topic into vagueness to dodge criticism. If the "
-            "findings are fatal and no honest reframing survives, set "
-            "should_revise=false and explain why in why_unchanged."
+            "NOT soften the topic into vagueness to dodge criticism.\n\n"
+            "CONSTRAINT THAT SURVIVES REVISION: the narrowed title must still be "
+            "a jargon-free public question an intelligent non-specialist would "
+            "want answered. Narrowing the SCOPE is required; narrowing into "
+            "insider vocabulary is a different failure and is not acceptable. "
+            "'Is test-time compute already hitting diminishing returns?' is NOT "
+            "an improvement on a too-broad title -- it just fails a different "
+            "test. Neither is a news headline about one company's incident. "
+            "Aim for a question that is both honest about scope AND readable by "
+            "someone who has never heard the insider term.\n\n"
+            "If the findings are fatal and no honest reframing survives both "
+            "constraints, set should_revise=false and explain why in "
+            "why_unchanged."
         )
         request = LLMRequest(
             agent="red_team_revision",
