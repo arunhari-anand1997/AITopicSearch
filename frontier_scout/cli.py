@@ -122,6 +122,9 @@ def collect(
 def trends(
     top: int = typer.Option(25, "--top", help="How many concepts to show"),
     json_out: bool = typer.Option(False, "--json", help="Emit JSON"),
+    nominated: bool = typer.Option(
+        False, "--nominated", help="Show auto-nominated phrases awaiting promotion"
+    ),
 ) -> None:
     """Compute and show momentum. No LLM calls, no cost."""
     settings, db = _setup()
@@ -136,23 +139,33 @@ def trends(
     metrics = engine.compute_all(run_id=run_id)
     db.finish_run(run_id)
 
+    # Auto-nominated phrases are a staging area, not the day's intelligence.
+    # Mixing them in lets a thin n-gram headline the table.
+    tracked = [m for m in metrics if m.status == "tracked"]
+    staged = [m for m in metrics if m.status != "tracked"]
+    shown = staged if nominated else tracked
+
     if json_out:
-        console.print_json(json.dumps([m.model_dump() for m in metrics[:top]], default=str))
+        console.print_json(json.dumps([m.model_dump() for m in shown[:top]], default=str))
         return
 
-    table = Table(title=f"Insider momentum — {len(metrics)} concepts tracked")
-    table.add_column("concept", max_width=34)
-    table.add_column("momentum", justify="right")
-    table.add_column("raw", justify="right")
+    if nominated:
+        title = f"Auto-nominated phrases — {len(staged)} awaiting promotion"
+    else:
+        title = f"Insider momentum — {len(tracked)} tracked concepts"
+    table = Table(title=title)
+    table.add_column("concept", max_width=32, overflow="fold")
+    table.add_column("mom", justify="right")
+    table.add_column("raw", justify="right", style="dim")
     table.add_column("24h", justify="right")
     table.add_column("7d", justify="right")
-    table.add_column("authors", justify="right")
-    table.add_column("indep", justify="right")
+    table.add_column("auth", justify="right")
+    table.add_column("ind", justify="right")
     table.add_column("ratio", justify="right")
-    table.add_column("plat", justify="right")
-    table.add_column("velocity", justify="right")
+    table.add_column("plt", justify="right")
+    table.add_column("vel", justify="right")
 
-    for m in metrics[:top]:
+    for m in shown[:top]:
         ratio_style = "red" if m.independence_ratio < 0.5 else "white"
         velocity = (
             f"{m.velocity_ratio:.1f}x" if m.velocity_ratio is not None else "[dim]n/a[/dim]"
@@ -160,7 +173,7 @@ def trends(
         table.add_row(
             m.concept_label,
             f"{m.insider_momentum:.3f}",
-            f"[dim]{m.insider_momentum_raw:.3f}[/dim]",
+            f"{m.insider_momentum_raw:.3f}",
             str(m.mentions_24h),
             str(m.mentions_7d),
             str(m.unique_authors_7d),
@@ -174,7 +187,13 @@ def trends(
         "\n[dim]ratio < 0.50 (red) means the sources share an origin: an echo, "
         "not independent convergence. Momentum is already discounted for it.[/dim]"
     )
-    flagged = [m for m in metrics[:top] if m.notes]
+    if not nominated and staged:
+        console.print(
+            f"[dim]{len(staged)} auto-nominated phrases are excluded from this table "
+            "and from editorial discovery until promoted in config/concepts.yaml. "
+            "See them with --nominated.[/dim]"
+        )
+    flagged = [m for m in shown[:top] if m.notes]
     if flagged:
         console.print("\n[bold]Notes[/bold]")
         for m in flagged[:8]:
