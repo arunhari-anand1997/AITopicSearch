@@ -1,0 +1,18 @@
+# Curated expert lists for X monitoring.
+#
+# The system does NOT treat follower count as authority. Follower count is
+# stored as one observable field; authority comes from membership in these
+# editor-curated lists. Add handles without the leading @.
+#
+# Left deliberately sparse: these should be YOUR lists, and a wrong name here
+# would quietly distort respected_source_presence.
+categories:
+  AI_RESEARCHERS: []
+  AI_BUILDERS: []
+  FOUNDERS: []
+  INFRASTRUCTURE: []
+  ROBOTICS: []
+  BIOTECH: []
+  ENERGY: []
+  TECH_POLICY: []
+  TECH_JOURNALISTS: []

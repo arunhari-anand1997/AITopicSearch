@@ -1,0 +1,92 @@
+# Frontier Scout editorial configuration.
+# Change monitored sources and scoring opinion here, never in Python.
+
+pipeline:
+  # How many concept groups pass the gate into the expensive LLM stage.
+  # Everything before the gate is free; everything after costs money.
+  gate_width: 12
+  max_concurrent_calls: 6
+  backfill_days: 90
+  daily_llm_budget_usd: 15.0
+  min_mentions_to_track: 2          # below this a concept is noise
+  candidates_per_cluster: 3
+  pairwise_top_n: 10
+  red_team_top_n: 5
+  brief_signal_count: 12            # 5-15 signals per daily brief
+
+models:
+  scout: claude-sonnet-5
+  generator: claude-opus-5
+  evaluator: claude-sonnet-5
+  pairwise: claude-sonnet-5
+  red_team: claude-sonnet-5
+  clusterer: claude-opus-5
+
+temperature:
+  # Low for extraction and judgement, higher where we want range.
+  scout: 0.2
+  clusterer: 0.3
+  translator: 0.8
+  generator: 0.9
+  evaluator: 0.0
+  pairwise: 0.0
+  red_team: 0.2
+
+# INSIDER_MOMENTUM component weights. Not sacred -- every component is stored
+# separately in concept_metrics so these can be refit against video outcomes.
+momentum_weights:
+  normalized_velocity: 0.30
+  unique_author_growth: 0.20
+  cross_platform_presence: 0.15
+  respected_source_presence: 0.15
+  engagement_acceleration: 0.10
+  novelty: 0.10
+
+# EDITORIAL_OPPORTUNITY is a weighted geometric mean of these, times a
+# coverage adjustment. Geometric so that a near-zero on any dimension
+# collapses the score: a huge trend with no consequence is not a video.
+opportunity_weights:
+  insider_momentum: 0.20
+  consequence: 0.25
+  public_confusion: 0.20
+  story_potential: 0.15
+  technical_substance: 0.20
+
+scoring:
+  velocity_cap: 10.0            # log-squash cap for ratio components
+  baseline_window_days: 28
+  baseline_exclude_recent_days: 3
+  min_baseline_days: 14         # below this, velocity is INSUFFICIENT_HISTORY
+  novelty_horizon_days: 180
+  independence_exponent: 0.5    # momentum *= independence_ratio ** this
+  coverage_penalty: 0.7         # opportunity *= 1 - penalty*saturation
+
+# X is OFF BY DEFAULT. X has no free tier: reads are billed per returned
+# resource (~$0.005/post), so a careless config spends real money. Enabling
+# this without setting the budget ceilings is refused by the connector.
+x:
+  enabled: false
+  max_results_per_query: 50
+  daily_budget_usd: 2.00
+  monthly_budget_usd: 40.00
+  # Endpoint availability differs by account. The connector probes these at
+  # startup and records what it actually got rather than assuming.
+  endpoints:
+    recent_search: true
+    full_archive_search: false    # typically Enterprise-gated
+    user_timeline: true
+
+youtube:
+  enabled: true                   # no-ops without YOUTUBE_API_KEY
+  # search.list is capped at 100 calls/day, SEPARATE from the 10,000-unit pool.
+  # This is the scarcest quota in the system, so coverage runs after the gate.
+  max_search_calls_per_day: 60
+  search_orders: [relevance, viewCount, date]
+  results_per_search: 15
+  cache_days: 7
+
+google_trends:
+  # Alpha, application-gated. Without access this reports NOT_AVAILABLE
+  # rather than substituting another metric: insider attention and public
+  # interest are different signals and conflating them defeats the point.
+  enabled: false

@@ -1,0 +1,60 @@
+# Primary-source lab and company blogs.
+#
+# IMPORTANT: these are PRIMARY_EVIDENCE for what the organisation CLAIMS.
+# They are never automatically evidence the claim is correct. Scout prompts
+# are required to render these as "X says Y", never as "Y".
+#
+# mode: rss     -> parse the feed
+# mode: sitemap -> no RSS exists; diff sitemap.xml by <lastmod> and fetch only
+#                  new pages, respecting robots.txt and a polite rate.
+feeds:
+  - name: OpenAI
+    url: https://openai.com/news/rss.xml
+    mode: rss
+    org: OpenAI
+    curated_tier: 1
+  - name: Google DeepMind
+    url: https://deepmind.google/blog/rss.xml
+    mode: rss
+    org: Google DeepMind
+    curated_tier: 1
+  - name: Microsoft Research
+    url: https://www.microsoft.com/en-us/research/feed/
+    mode: rss
+    org: Microsoft Research
+    curated_tier: 1
+  - name: NVIDIA Developer
+    url: https://developer.nvidia.com/blog/feed/
+    mode: rss
+    org: NVIDIA
+    curated_tier: 2
+  - name: Hugging Face
+    url: https://huggingface.co/blog/feed.xml
+    mode: rss
+    org: Hugging Face
+    curated_tier: 2
+  - name: Google Research
+    url: https://research.google/blog/rss/
+    mode: rss
+    org: Google Research
+    curated_tier: 1
+  - name: BAIR
+    url: https://bair.berkeley.edu/blog/feed.xml
+    mode: rss
+    org: UC Berkeley BAIR
+    curated_tier: 1
+
+  # No RSS feed exists for these; verified 404 on the conventional paths.
+  # robots.txt allows crawling and advertises the sitemap.
+  - name: Anthropic
+    url: https://www.anthropic.com/sitemap.xml
+    mode: sitemap
+    org: Anthropic
+    curated_tier: 1
+    include_paths: ["/news/", "/research/", "/engineering/"]
+  # Meta AI is deliberately NOT collected. ai.meta.com publishes no RSS and no
+  # sitemap (both 404), and its robots.txt opens with an explicit notice that
+  # "Collection of data on Facebook through automated means is prohibited
+  # unless you have express written permission". We respect that: no feed, no
+  # crawl. If Meta coverage matters, add it via `frontier-scout ingest` from a
+  # manually gathered file instead.

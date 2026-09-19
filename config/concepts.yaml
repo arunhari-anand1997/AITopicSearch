@@ -1,0 +1,67 @@
+# Seed concept registry.
+#
+# Concept identity is LEXICAL and stable on purpose. If a model re-extracted
+# and re-labelled concepts each day, the 30-day time series would silently
+# fragment into disconnected pieces and every velocity number would be fiction.
+# So: canonical_label is the stable identity, aliases are the surface forms we
+# match, and the LLM's job is to PROPOSE additions to this registry -- never to
+# do the counting.
+#
+# kind: term | claim | capability | debate
+# The system also auto-nominates new phrases it sees spreading across
+# independent authors; those land with status=nominated for editor promotion.
+concepts:
+  - canonical_label: agent harness
+    kind: term
+    aliases: ["agent harness", "harness engineering", "agentic harness", "agent scaffolding"]
+  - canonical_label: context engineering
+    kind: term
+    aliases: ["context engineering", "context window engineering"]
+  - canonical_label: prompt engineering
+    kind: term
+    aliases: ["prompt engineering", "prompting"]
+  - canonical_label: agentic loop
+    kind: term
+    aliases: ["agentic loop", "agent loop", "loop engineering"]
+  - canonical_label: verification bottleneck
+    kind: claim
+    aliases: ["verification bottleneck", "verification is the bottleneck", "verifier gap"]
+  - canonical_label: world models
+    kind: term
+    aliases: ["world model", "world models", "world modeling"]
+  - canonical_label: multi-agent orchestration
+    kind: term
+    aliases: ["multi-agent", "multi agent", "agent swarm", "subagent", "subagents", "agent orchestration", "graph engineering"]
+  - canonical_label: test-time compute
+    kind: capability
+    aliases: ["test-time compute", "test time compute", "inference-time compute", "thinking tokens"]
+  - canonical_label: inference cost collapse
+    kind: claim
+    aliases: ["inference cost", "inference costs", "cost per token", "inference economics"]
+  - canonical_label: open weights
+    kind: debate
+    aliases: ["open weights", "open-weight", "open source models", "open weight models"]
+  - canonical_label: synthetic data
+    kind: term
+    aliases: ["synthetic data", "self-generated data"]
+  - canonical_label: AI coding agents
+    kind: capability
+    aliases: ["coding agent", "coding agents", "ai coding agent", "swe agent"]
+  - canonical_label: context rot
+    kind: term
+    aliases: ["context rot", "context degradation"]
+  - canonical_label: evals
+    kind: term
+    aliases: ["evals", "eval harness", "benchmark saturation"]
+  - canonical_label: reinforcement learning from verifiable rewards
+    kind: capability
+    aliases: ["rlvr", "verifiable rewards", "reinforcement learning from verifiable rewards"]
+  - canonical_label: recursive self-improvement
+    kind: debate
+    aliases: ["recursive self-improvement", "rsi", "self-improving ai"]
+  - canonical_label: mechanistic interpretability
+    kind: term
+    aliases: ["mechanistic interpretability", "interpretability", "sparse autoencoder"]
+  - canonical_label: robotics foundation models
+    kind: capability
+    aliases: ["robot foundation model", "robotics foundation model", "vision language action", "vla model"]

@@ -1,0 +1,68 @@
+# Curated newsletters. Public RSS only; paywalled bodies are never bypassed.
+# curated_tier: 1 = highly respected in-domain, 2 = solid, 3 = watchlist.
+# Tier drives respected_source_presence. It is set by the editor here and is
+# never invented by a model.
+feeds:
+  # --- AI research / engineering ---
+  - name: Interconnects
+    url: https://www.interconnects.ai/feed
+    domain: ai_research
+    curated_tier: 1
+  - name: One Useful Thing
+    url: https://www.oneusefulthing.org/feed
+    domain: ai_practice
+    curated_tier: 1
+  - name: Don't Worry About the Vase
+    # thezvi.substack.com is behind a Cloudflare bot challenge; the author's
+    # own domain serves the same feed and is not challenge-gated.
+    url: https://thezvi.wordpress.com/feed
+    domain: ai_analysis
+    curated_tier: 1
+  - name: Simon Willison
+    url: https://simonwillison.net/atom/everything/
+    domain: ai_engineering
+    curated_tier: 1
+  - name: The Pragmatic Engineer
+    url: https://newsletter.pragmaticengineer.com/feed
+    domain: software_engineering
+    curated_tier: 1
+  - name: Import AI
+    # Same as above: importai.substack.com is challenge-gated, jack-clark.net
+    # is the author's own domain and serves the feed directly.
+    url: https://jack-clark.net/feed
+    domain: ai_research
+    curated_tier: 1
+  # AI Supremacy is behind a Cloudflare bot challenge with no alternate domain
+  # found. Left commented out rather than kept as a permanently failing source.
+  # - name: AI Supremacy
+  #   url: https://aisupremacy.substack.com/feed
+  #   domain: ai_industry
+  #   curated_tier: 2
+  - name: Marginal Revolution
+    url: https://marginalrevolution.com/feed
+    domain: economics
+    curated_tier: 2
+
+  # --- semiconductors / infrastructure / energy ---
+  - name: SemiAnalysis
+    url: https://semianalysis.com/feed/
+    domain: semiconductors
+    curated_tier: 1
+  - name: Construction Physics
+    url: https://www.construction-physics.com/feed
+    domain: infrastructure
+    curated_tier: 2
+
+  # --- biotech / science ---
+  # (Asimov Press removed: no working public feed found -- /feed, /rss and
+  #  /feed.xml all 404 as of 2026-09-19. Add a biotech newsletter here.)
+
+  # --- strategy / venture ---
+  - name: Stratechery
+    url: https://stratechery.com/feed/
+    domain: tech_strategy
+    curated_tier: 1
+  - name: Astral Codex Ten
+    url: https://www.astralcodexten.com/feed
+    domain: analysis
+    curated_tier: 2

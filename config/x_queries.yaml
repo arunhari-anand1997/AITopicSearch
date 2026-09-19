@@ -1,0 +1,16 @@
+# X keyword monitoring. DISABLED by default (see editorial.yaml x.enabled).
+#
+# COST WARNING: X has no free tier. Reads are billed PER RETURNED RESOURCE at
+# roughly $0.005 per post, so one query returning 100 posts costs ~$0.50.
+# Resources are deduplicated within a 24h UTC window, which is why collection
+# runs once per UTC day rather than polling.
+queries:
+  - '"world model" -is:retweet lang:en'
+  - '"context engineering" -is:retweet lang:en'
+  - '"agent harness" -is:retweet lang:en'
+  - '"test time compute" OR "test-time compute" -is:retweet lang:en'
+  - '"open weights" -is:retweet lang:en'
+  - '"synthetic data" -is:retweet lang:en'
+  - '"inference cost" -is:retweet lang:en'
+  - '"agent swarm" OR "multi-agent" -is:retweet lang:en'
+  - '"verification" ("agents" OR "bottleneck") -is:retweet lang:en'

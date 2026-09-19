@@ -1,0 +1,26 @@
+# arXiv. No credentials. Official terms require no more than one request every
+# three seconds on a single connection, enforced globally in the connector.
+#
+# A paper existing is a weak signal. Papers earn attention from INBOUND
+# references -- arXiv IDs extracted from newsletters, HN and lab blogs -- which
+# the trend engine resolves against paper_refs.
+categories:
+  - cs.AI
+  - cs.LG
+  - cs.CL
+  - cs.CV
+  - cs.RO
+  - cs.HC
+  - cs.MA
+  - stat.ML
+max_results_per_category: 60
+
+phrase_queries:
+  - "world model"
+  - "agent harness"
+  - "test-time compute"
+  - "verification"
+  - "multi-agent"
+  - "synthetic data"
+  - "inference cost"
+max_results_per_phrase: 30

@@ -1,0 +1,26 @@
+# YouTube measures EXISTING COVERAGE, never insider attention.
+#
+# QUOTA WARNING: search.list is capped at 100 calls/day as a budget SEPARATE
+# from the 10,000-unit pool. videos.list costs 1 unit from the 10k pool, so
+# enrichment is effectively free and search is the scarce resource. Coverage
+# checks therefore run only on concepts that already passed the momentum gate.
+#
+# Coverage quality is judged semantically by the Coverage Scout. Result count
+# is never used as a proxy: a hundred "X Tutorial" videos leave the
+# general-audience gap wide open.
+standing_queries: []   # populated from gated concepts at runtime
+
+content_kinds:
+  - tutorial
+  - product_news
+  - interview
+  - prediction
+  - general_explainer
+  - documentary
+  - conference_talk
+
+# Only these kinds count toward general-audience saturation.
+saturating_kinds:
+  - general_explainer
+  - documentary
+min_views_to_saturate: 50000

@@ -1,0 +1,19 @@
+# Hacker News. No credentials, and the official API documents no rate limit.
+#
+# Two connectors because they do different jobs:
+#   firebase -> the live front page (what the community is reacting to now)
+#   algolia  -> historical search, which is what makes day-1 baselines possible
+#
+# HN is ONE insider-community signal. It is not representative of the general
+# population and the scoring never treats it as public interest.
+firebase:
+  feeds: [topstories, beststories, newstories, showstories, askstories]
+  items_per_feed: 80
+  min_score: 5
+
+algolia:
+  # Backfill windows for baseline construction.
+  backfill_days: 90
+  hits_per_page: 100
+  max_pages: 5
+  include_comments: true

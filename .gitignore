@@ -1,0 +1,17 @@
+.env
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+data/frontier_scout.db
+data/frontier_scout.db-*
+data/raw/*
+!data/raw/.gitkeep
+data/runs/*
+!data/runs/.gitkeep
+data/exports/*
+!data/exports/.gitkeep
+data/cache/
