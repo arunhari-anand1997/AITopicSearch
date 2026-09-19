@@ -102,7 +102,11 @@ class TrendEngine:
             (concept_id,),
         ).fetchall()
 
-        m = ConceptMetrics(concept_id=concept_id, concept_label=self.registry.label(concept_id))
+        m = ConceptMetrics(
+            concept_id=concept_id,
+            concept_label=self.registry.label(concept_id),
+            status=self.registry.status(concept_id),
+        )
         if not rows:
             m.notes.append("no dated mentions")
             return m

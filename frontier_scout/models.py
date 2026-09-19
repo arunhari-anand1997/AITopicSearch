@@ -210,6 +210,9 @@ class TrendComponents(BaseModel):
 class ConceptMetrics(BaseModel):
     concept_id: int
     concept_label: str = ""
+    #: "tracked" (editor-approved) or "nominated" (auto-discovered, awaiting
+    #: promotion). Only tracked concepts are eligible for the expensive stage.
+    status: str = "tracked"
     computed_at: datetime = Field(default_factory=utcnow)
 
     mentions_24h: int = 0

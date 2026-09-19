@@ -22,8 +22,27 @@ models:
   red_team: claude-sonnet-5
   clusterer: claude-opus-5
 
-temperature:
-  # Low for extraction and judgement, higher where we want range.
+# NOTE ON TEMPERATURE.
+# The original plan was "low temperature for extraction, higher for generation".
+# That is no longer expressible: current models (Opus 5, Sonnet 5, Opus 4.7/4.8,
+# Fable) REJECT `temperature` with a 400 error. `output_config.effort` is the
+# replacement lever -- it controls how much the model thinks and spends.
+#
+# So: cheap, mechanical work runs at lower effort; the judgement-heavy and
+# generative stages get more. Temperature is still sent to older models that
+# accept it (see SAMPLING_MODELS in llm/anthropic_provider.py), which is why
+# the legacy block is kept below rather than deleted.
+effort:
+  scout: medium
+  clusterer: high
+  translator: high
+  generator: high
+  evaluator: medium
+  pairwise: medium
+  red_team: medium
+
+legacy_temperature:
+  # Applied ONLY on models that still accept sampling parameters.
   scout: 0.2
   clusterer: 0.3
   translator: 0.8

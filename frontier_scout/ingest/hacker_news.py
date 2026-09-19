@@ -192,6 +192,10 @@ class HNSearchConnector(Connector):
         body = comment or story_text or ""
         if not title and not body:
             return None
+        # Moderated-away items carry no content and would pollute both the
+        # dossier and the brief's source lists.
+        if (title or "").strip() in ("[dead]", "[flagged]", "[deleted]") and not body:
+            return None
         url = hit.get("url") or hit.get("story_url")
         return SourceItem(
             source_type=SourceType.HACKER_NEWS,

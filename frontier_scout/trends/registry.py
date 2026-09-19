@@ -110,6 +110,7 @@ class ConceptRegistry:
         self.db = db
         self._alias_to_concept: dict[str, int] = {}
         self._labels: dict[int, str] = {}
+        self._status: dict[int, str] = {}
         self._max_alias_words = 1
         self.reload()
 
@@ -118,14 +119,16 @@ class ConceptRegistry:
     def reload(self) -> None:
         self._alias_to_concept.clear()
         self._labels.clear()
+        self._status.clear()
         rows = self.db.conn.execute(
-            "SELECT a.normalized, a.concept_id, c.canonical_label FROM concept_aliases a"
-            " JOIN concepts c ON c.id = a.concept_id"
+            "SELECT a.normalized, a.concept_id, c.canonical_label, c.status"
+            " FROM concept_aliases a JOIN concepts c ON c.id = a.concept_id"
             " WHERE c.status IN ('tracked','nominated') AND c.merged_into IS NULL"
         ).fetchall()
         for row in rows:
             self._alias_to_concept[row["normalized"]] = row["concept_id"]
             self._labels[row["concept_id"]] = row["canonical_label"]
+            self._status[row["concept_id"]] = row["status"]
         self._max_alias_words = max(
             (len(a.split()) for a in self._alias_to_concept), default=1
         )
@@ -176,6 +179,19 @@ class ConceptRegistry:
     @property
     def concept_ids(self) -> list[int]:
         return sorted(self._labels)
+
+    def status(self, concept_id: int) -> str:
+        return self._status.get(concept_id, "tracked")
+
+    @property
+    def tracked_ids(self) -> list[int]:
+        """Editor-approved concepts only.
+
+        Auto-nominated phrases are measured but must not reach the expensive
+        stage on their own: a nomination is a suggestion for the editor, not a
+        decision the system gets to make for itself.
+        """
+        return sorted(cid for cid, st in self._status.items() if st == "tracked")
 
     # -- matching ----------------------------------------------------------
 

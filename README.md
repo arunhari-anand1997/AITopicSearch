@@ -215,3 +215,40 @@ ideas. It does not replace the editor.
 
 See `docs/ARCHITECTURE.md` for the full design, the verified API-access
 findings, and the measurement traps this system is built to avoid.
+
+---
+
+## Appendix: what the build verified
+
+Every API-access claim in `docs/ARCHITECTURE.md` was checked against live
+documentation and live endpoints rather than assumed. Three findings changed the
+implementation:
+
+- **X has no free tier.** Reads are billed per returned resource (~$0.005/post),
+  so the nine standing queries would cost roughly $135/month. The connector
+  refuses to run without an explicit budget ceiling and estimates every call's
+  cost before making it. It ships disabled.
+- **`temperature` is rejected with a 400 on current models.** The original
+  "low temperature for extraction, higher for generation" plan is not
+  expressible; `output_config.effort` replaces it, and temperature is sent only
+  to older models that still accept it.
+- **YouTube `search.list` is capped at 100 calls/day**, separate from the
+  10,000-unit pool, so coverage checks run only after the momentum gate.
+
+Two sources are deliberately not collected:
+
+- **Meta AI** publishes no feed and its `robots.txt` prohibits automated
+  collection, so it is excluded rather than crawled.
+- Feeds behind a **Cloudflare bot challenge** are reported by name and not
+  worked around; where the publication serves the same feed from its own
+  domain, the config points there instead.
+
+Measurement traps found by probing, and what the code does about them:
+
+| Trap | Mitigation |
+|---|---|
+| Algolia caps a response at 1000 hits, so its apparent "first seen" is a pagination artifact that scores years-old terms as brand new | Novelty comes only from our own `first_observed_at` |
+| A literal phrase match is not a same-sense match (`loop engineering` meant control loops in 2012) | Every mention stores a context snippet; scouts must separate NEW_TERM from OLD_IDEA_NEW_LABEL |
+| Unique-author counts capped by page size look plausible and mean nothing | Counts come from fully paginated fetches persisted locally |
+| Smart quotes split contractions into phantom bigrams (`don t`) | Unicode punctuation normalised before tokenising |
+| Overlapping n-grams nominate one idea five times, fragmenting its series | Subsumption collapses them onto the longest useful form |

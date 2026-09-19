@@ -19,6 +19,7 @@ from .arxiv import ArxivConnector
 from .hacker_news import HackerNewsConnector, HNSearchConnector
 from .primary_blogs import PrimaryBlogConnector
 from .substack import SubstackConnector
+from .x_api import XConnector
 
 
 @dataclass
@@ -78,6 +79,10 @@ async def collect_all(
         connectors = [cls(settings, client) for cls in CORE_CONNECTORS]
         if include_backfill:
             connectors.append(HNSearchConnector(settings, client))
+        # X is opt-in and costs real money per returned post; the connector
+        # itself refuses to run without an explicit budget ceiling.
+        if (settings.x_config or {}).get("enabled", False):
+            connectors.append(XConnector(settings, client))
         if only:
             connectors = [c for c in connectors if c.name in only]
 
