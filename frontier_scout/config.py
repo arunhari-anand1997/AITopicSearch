@@ -50,6 +50,7 @@ class Settings:
 
     # credentials
     anthropic_api_key: str | None = field(default=None, repr=False)
+    deepseek_api_key: str | None = field(default=None, repr=False)
     youtube_api_key: str | None = field(default=None, repr=False)
     x_bearer_token: str | None = field(default=None, repr=False)
     google_trends_api_key: str | None = field(default=None, repr=False)
@@ -61,6 +62,7 @@ class Settings:
         raw = _load_yaml("editorial.yaml")
         return cls(
             anthropic_api_key=os.getenv("ANTHROPIC_API_KEY") or None,
+            deepseek_api_key=os.getenv("DEEPSEEK_API_KEY") or None,
             youtube_api_key=os.getenv("YOUTUBE_API_KEY") or None,
             x_bearer_token=os.getenv("X_BEARER_TOKEN") or None,
             google_trends_api_key=os.getenv("GOOGLE_TRENDS_API_KEY") or None,
@@ -87,6 +89,11 @@ class Settings:
     @property
     def models(self) -> dict[str, str]:
         return self.section("models", {})
+
+    @property
+    def llm_provider(self) -> str:
+        """Which provider the agent layer uses: 'anthropic', 'deepseek' or 'auto'."""
+        return str(self.section("llm", {}).get("provider", "auto"))
 
     @property
     def x_config(self) -> dict[str, Any]:

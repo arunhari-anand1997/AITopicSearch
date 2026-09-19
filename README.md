@@ -102,8 +102,25 @@ cp .env.example .env        # optional; see below
 ```
 
 **The four core connectors need no credentials.** Substack RSS, Hacker News,
-arXiv and the lab blogs all work out of the box. `ANTHROPIC_API_KEY` is needed
-only for the agent layer; `YOUTUBE_API_KEY` only for coverage analysis.
+arXiv and the lab blogs all work out of the box. An LLM key is needed only for
+the agent layer; `YOUTUBE_API_KEY` only for coverage analysis.
+
+### Choosing an LLM provider
+
+Two are supported. Set `llm.provider` in `config/editorial.yaml` to
+`anthropic`, `deepseek`, or `auto` (takes whichever key is present).
+
+| | Anthropic | DeepSeek |
+|---|---|---|
+| Key | `ANTHROPIC_API_KEY` | `DEEPSEEK_API_KEY` |
+| Schema enforcement | server-side (`json_schema`) | **prompt-only** — `json_schema` returns 400 |
+| Sampling | `temperature` rejected; `effort` instead | `temperature` works |
+| Caching | explicit `cache_control` | automatic prefix caching |
+| Cost, 50k in / 5k out | ~$0.375 (Opus 5) | ~$0.086 (v4-pro) |
+
+The pipeline behaves identically either way. On DeepSeek the runner's
+schema-repair loop becomes load-bearing rather than a safety net, since nothing
+enforces the shape server-side — which is why that loop is tested directly.
 
 ## 4. Run
 
@@ -228,10 +245,17 @@ implementation:
   so the nine standing queries would cost roughly $135/month. The connector
   refuses to run without an explicit budget ceiling and estimates every call's
   cost before making it. It ships disabled.
-- **`temperature` is rejected with a 400 on current models.** The original
+- **`temperature` is rejected with a 400 on current Claude models.** The original
   "low temperature for extraction, higher for generation" plan is not
-  expressible; `output_config.effort` replaces it, and temperature is sent only
-  to older models that still accept it.
+  expressible there; `output_config.effort` replaces it. On DeepSeek temperature
+  *is* accepted, so the original plan works as written — the `legacy_temperature`
+  block in `config/editorial.yaml` is live on that provider.
+- **DeepSeek does not support server-side JSON schemas.** `response_format:
+  json_schema` returns *"This response_format type is unavailable now"*; only
+  `json_object` works, it requires the word "json" in the prompt, and it
+  occasionally returns empty content. The provider injects the schema into the
+  prompt, treats empty content as retryable, and leans on the runner's
+  validation loop.
 - **YouTube `search.list` is capped at 100 calls/day**, separate from the
   10,000-unit pool, so coverage checks run only after the momentum gate.
 

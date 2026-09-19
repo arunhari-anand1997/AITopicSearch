@@ -5,7 +5,7 @@ pipeline:
   # How many concept groups pass the gate into the expensive LLM stage.
   # Everything before the gate is free; everything after costs money.
   gate_width: 12
-  max_concurrent_calls: 6
+  max_concurrent_calls: 12
   backfill_days: 90
   daily_llm_budget_usd: 15.0
   min_mentions_to_track: 2          # below this a concept is noise
@@ -14,6 +14,12 @@ pipeline:
   red_team_top_n: 5
   brief_signal_count: 12            # 5-15 signals per daily brief
 
+# Which provider the agent layer uses: anthropic | deepseek | auto.
+# 'auto' takes whichever key is present, Anthropic first.
+llm:
+  provider: deepseek
+
+# Anthropic model map (used when provider resolves to anthropic).
 models:
   scout: claude-sonnet-5
   generator: claude-opus-5
@@ -21,6 +27,22 @@ models:
   pairwise: claude-sonnet-5
   red_team: claude-sonnet-5
   clusterer: claude-opus-5
+
+# DeepSeek model map. deepseek-flash is roughly 4x cheaper than v4-pro, so
+# high-volume extraction and the pairwise tournament run on flash while
+# judgement and generation run on pro.
+#
+# NOTE: DeepSeek does NOT support server-side schema enforcement
+# (response_format json_schema returns 400), so the schema is injected into the
+# prompt and validated client-side by the runner's repair loop.
+deepseek_models:
+  scout: deepseek-flash
+  clusterer: deepseek-v4-pro
+  translator: deepseek-v4-pro
+  generator: deepseek-v4-pro
+  evaluator: deepseek-v4-pro
+  pairwise: deepseek-flash
+  red_team: deepseek-v4-pro
 
 # NOTE ON TEMPERATURE.
 # The original plan was "low temperature for extraction, higher for generation".
@@ -42,7 +64,9 @@ effort:
   red_team: medium
 
 legacy_temperature:
-  # Applied ONLY on models that still accept sampling parameters.
+  # Applied on models that accept sampling parameters. DeepSeek does, so on
+  # DeepSeek these are live and the original low-for-extraction /
+  # high-for-generation plan works as originally intended.
   scout: 0.2
   clusterer: 0.3
   translator: 0.8

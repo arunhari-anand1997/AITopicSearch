@@ -46,14 +46,33 @@ def _setup() -> tuple[Settings, Database]:
 
 
 def _provider(settings: Settings):
-    """Build the LLM provider, or return None with a clear explanation."""
-    from .llm.anthropic_provider import AnthropicProvider
+    """Build the LLM provider, or return None with a clear explanation.
 
-    try:
-        return AnthropicProvider(settings)
-    except LLMUnavailable as exc:
-        console.print(f"[yellow]LLM unavailable:[/yellow] {exc}")
-        return None
+    'auto' prefers whichever key is present, Anthropic first. The pipeline
+    behaves identically either way; only cost, latency and whether the schema
+    is enforced server-side differ.
+    """
+    from .llm.anthropic_provider import AnthropicProvider
+    from .llm.deepseek_provider import DeepSeekProvider
+
+    choice = settings.llm_provider.lower()
+    order = {
+        "anthropic": [("anthropic", AnthropicProvider)],
+        "deepseek": [("deepseek", DeepSeekProvider)],
+    }.get(choice, [("anthropic", AnthropicProvider), ("deepseek", DeepSeekProvider)])
+
+    reasons = []
+    for name, cls in order:
+        try:
+            provider = cls(settings)
+            console.print(f"[dim]LLM provider: {name}[/dim]")
+            return provider
+        except LLMUnavailable as exc:
+            reasons.append(f"{name}: {exc}")
+
+    for reason in reasons:
+        console.print(f"[yellow]LLM unavailable:[/yellow] {reason}")
+    return None
 
 
 def _run_id(prefix: str = "run") -> str:
