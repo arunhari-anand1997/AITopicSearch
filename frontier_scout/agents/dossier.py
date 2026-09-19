@@ -104,7 +104,15 @@ def build_dossier(db: Database, group: ConceptGroup, *, max_items: int = 40) -> 
             f"papers: {m.paper_count}"
         )
         lines.append(f"- momentum: {m.insider_momentum:.3f} (raw {m.insider_momentum_raw:.3f})")
-        lines.append(f"- public search interest: {m.google_search_change}")
+        lines.append(
+            f"- PUBLIC search interest: {m.google_search_change}"
+        )
+        lines.append(
+            "  (0-100 is Google's index relative to this term's OWN peak, not an "
+            "absolute volume. Public interest is a DIFFERENT signal from the "
+            "insider attention above: insider momentum high while public "
+            "interest is flat or falling means the public has not caught up.)"
+        )
         for note in m.notes:
             lines.append(f"- NOTE: {note}")
         lines.append("")
@@ -125,6 +133,15 @@ def build_dossier(db: Database, group: ConceptGroup, *, max_items: int = 40) -> 
             )
             lines.append(f"- {label}: {chain}")
         lines.append("")
+
+    # -- X, derived from citations rather than the paid API -----------------
+    from ..trends import x_citations
+
+    for concept_id in group.concept_ids[:1]:
+        signal = x_citations.compute(db, concept_id=concept_id, days=60, limit=6)
+        rendered = signal.render()
+        if rendered:
+            lines.append(rendered)
 
     # -- the actual sources ------------------------------------------------
     lines.append("## SOURCE ITEMS")

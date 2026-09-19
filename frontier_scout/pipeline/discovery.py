@@ -147,6 +147,9 @@ class DiscoveryPipeline:
             self.db.finish_run(self.run_id, "partial", "no LLM provider")
             return result
 
+        # Public interest first: the scouts should see the divergence.
+        await self.fetch_public_interest(result.groups)
+
         if coverage_blocks is None:
             coverage_blocks = await self.fetch_coverage(result.groups)
             if not coverage_blocks:
@@ -390,6 +393,42 @@ class DiscoveryPipeline:
         ones, and either failure is invisible after the fact.
         """
         return {g.key: None for g in groups if not coverage_blocks.get(g.key)}
+
+    async def fetch_public_interest(
+        self, groups: list[ConceptGroup]
+    ) -> dict[int, str]:
+        """Public search interest per gated concept.
+
+        Runs after the gate because SerpAPI bills per search against a monthly
+        quota. Feeds `google_search_change` and the public-confusion dimension
+        only -- never INSIDER_MOMENTUM. The whole point is that insider
+        attention and public interest are different signals: a concept
+        insiders are converging on while public search stays flat or falls is
+        the editorial opportunity, and merging them would erase it.
+        """
+        from ..ingest.serpapi_trends import SerpApiTrendsConnector
+
+        readings: dict[int, str] = {}
+        async with SerpApiTrendsConnector(self.settings) as trends:
+            if not trends.enabled:
+                return readings
+            for group in groups:
+                for metrics in group.metrics[:1]:  # one query per group
+                    result = await trends.interest(metrics.concept_label)
+                    summary = result.summary()
+                    readings[metrics.concept_id] = summary
+                    metrics.google_search_change = summary
+                    if result.status == ConnectorStatus.OK and result.direction:
+                        # The divergence IS the finding, so state it plainly
+                        # where the scouts and the editor will both see it.
+                        if result.direction in ("falling", "flat") and metrics.insider_momentum > 0.15:
+                            metrics.notes.append(
+                                f"DIVERGENCE: insider momentum {metrics.insider_momentum:.2f} "
+                                f"while public search interest is {result.direction} "
+                                f"({result.change_7d_vs_90d:+.0%} vs its 90-day average). "
+                                "Insiders are moving on this ahead of the public."
+                            )
+        return readings
 
     async def fetch_coverage(self, groups: list[ConceptGroup]) -> dict[str, str]:
         """Pull existing YouTube coverage for gated groups only.

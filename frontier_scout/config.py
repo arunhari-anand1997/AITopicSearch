@@ -54,6 +54,7 @@ class Settings:
     youtube_api_key: str | None = field(default=None, repr=False)
     x_bearer_token: str | None = field(default=None, repr=False)
     google_trends_api_key: str | None = field(default=None, repr=False)
+    serpapi_key: str | None = field(default=None, repr=False)
 
     raw: dict[str, Any] = field(default_factory=dict)
 
@@ -66,6 +67,7 @@ class Settings:
             youtube_api_key=os.getenv("YOUTUBE_API_KEY") or None,
             x_bearer_token=os.getenv("X_BEARER_TOKEN") or None,
             google_trends_api_key=os.getenv("GOOGLE_TRENDS_API_KEY") or None,
+            serpapi_key=os.getenv("SERPAPI_KEY") or None,
             raw=raw,
         )
 

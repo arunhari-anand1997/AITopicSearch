@@ -127,6 +127,10 @@ def write_daily_brief(
         lines.append("")
         lines.append(f"**Public search interest:** {m.google_search_change}")
         lines.append("")
+        lines.append(
+            "<sub>0-100 is relative to this term's own peak, not absolute volume.</sub>"
+        )
+        lines.append("")
         sources = _key_sources(db, m.concept_id)
         if sources:
             lines.append("**Recent sources:**")

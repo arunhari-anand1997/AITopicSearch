@@ -129,7 +129,16 @@ youtube:
   cache_days: 7
 
 google_trends:
-  # Alpha, application-gated. Without access this reports NOT_AVAILABLE
-  # rather than substituting another metric: insider attention and public
-  # interest are different signals and conflating them defeats the point.
-  enabled: false
+  # The OFFICIAL Google Trends API is alpha and application-gated. This path
+  # uses SerpAPI instead, which supplies the same Trends data commercially.
+  # Values are labelled serpapi_google_trends so no brief implies we hold
+  # first-party Google data.
+  #
+  # Public interest stays SEPARATE from insider momentum. A concept insiders
+  # are converging on while public search stays flat is the opportunity we
+  # want, so this never feeds INSIDER_MOMENTUM.
+  enabled: true
+  # SerpAPI bills per search against a monthly quota, so this is capped per
+  # run and cached for days -- Trends is weekly data.
+  max_searches_per_run: 8
+  cache_days: 3
