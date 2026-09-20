@@ -259,3 +259,51 @@ def test_dossier_section_includes_claims_via_article_provenance(
 
     rendered = contradictions.render_for_dossier(db, concept_id)
     assert "simulators now predict" in rendered
+
+
+def test_org_bylines_are_not_treated_as_one_mind_changing(db, settings, make_source_item):
+    """A company blog is many writers; two differing posts is not a reversal.
+
+    Live data produced "Anthropic moved from skeptical to advocating on evals"
+    across two posts one day apart. That is an artifact of one byline covering
+    many authors, and it would be a false editorial lead.
+    """
+    from frontier_scout.models import SourceItem, SourceRole, SourceType
+
+    extractor = _extractor(db, settings)
+    concept_id = extractor.registry.concept_ids[0]
+    now = datetime.now(timezone.utc)
+
+    ids = []
+    for i, stance in enumerate(("skeptical", "advocating")):
+        item = SourceItem(
+            source_type=SourceType.COMPANY_BLOG, source_name="BigLab",
+            external_id=f"org{i}", title="post", text="an argument about world models",
+            author_handle="BigLab", publication="BigLab",
+            published_at=now - timedelta(days=200 - i * 150),
+            source_role=SourceRole.PRIMARY_EVIDENCE, primary_or_secondary="PRIMARY",
+        )
+        db.insert_source_item(item)
+        ids.append(item.id)
+        row = db.conn.execute(
+            "SELECT author_id FROM source_items WHERE id=?", (item.id,)
+        ).fetchone()
+        _position(db, item.id, concept_id, row["author_id"], stance,
+                  (now - timedelta(days=200 - i * 150)).isoformat())
+
+    assert not [r for r in contradictions.find_reversals(db) if r.author == "BigLab"]
+
+
+def test_same_week_stance_flip_is_not_a_reversal(db, settings, make_source_item):
+    """Changing your mind takes longer than a day."""
+    extractor = _extractor(db, settings)
+    concept_id = extractor.registry.concept_ids[0]
+    now = datetime.now(timezone.utc)
+
+    for i, stance in enumerate(("skeptical", "advocating")):
+        row = _article(db, make_source_item, ext=f"fast{i}", text="a view",
+                       author="hasty", days_ago=10 - i)
+        _position(db, row["id"], concept_id, row["author_id"], stance,
+                  (now - timedelta(days=10 - i)).isoformat())
+
+    assert not [r for r in contradictions.find_reversals(db) if r.author == "hasty"]

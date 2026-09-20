@@ -137,11 +137,24 @@ def find_disputes(
     return disputes
 
 
-def find_reversals(db: Database, *, days: int = 400) -> list[Reversal]:
+def find_reversals(
+    db: Database, *, days: int = 400, min_days_between: int = 21
+) -> list[Reversal]:
     """Authors who changed their own mind.
 
-    Two paths to a reversal: an explicit self-correction flagged during
-    extraction, or an observed stance flip on the same concept over time.
+    Two paths: an explicit self-correction flagged during extraction, or an
+    observed stance flip on the same concept over time.
+
+    Two guards, both learned from false positives on live data:
+
+    - ORGANISATIONS ARE EXCLUDED. A company blog is many writers under one
+      byline, so two posts taking different stances is not one mind changing.
+      Live data produced "Anthropic moved from skeptical to advocating on
+      evals" between two posts one day apart, which is an artifact, not a
+      reversal.
+    - A MINIMUM GAP is required. Changing your mind takes longer than a day;
+      anything faster is two different pieces on different aspects, or an
+      extraction wobble.
     """
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
     rows = db.conn.execute(
@@ -152,8 +165,11 @@ def find_reversals(db: Database, *, days: int = 400) -> list[Reversal]:
         FROM article_positions p
         JOIN concepts c ON c.id = p.concept_id
         JOIN authors a ON a.id = p.author_id
+        JOIN source_items s ON s.id = p.source_item_id
         WHERE p.stance IN ('advocating','skeptical')
           AND COALESCE(p.observed_at,'') >= ?
+          AND s.primary_or_secondary <> 'PRIMARY'
+          AND s.source_type <> 'company_blog'
         ORDER BY p.author_id, p.concept_id, p.observed_at
         """,
         (cutoff,),
@@ -169,7 +185,12 @@ def find_reversals(db: Database, *, days: int = 400) -> list[Reversal]:
         if len(entries) < 2:
             continue
         first, last = entries[0], entries[-1]
-        if OPPOSING.get(first["stance"]) == last["stance"]:
+        if OPPOSING.get(first["stance"]) != last["stance"]:
+            continue
+        gap = _gap_days(first["observed_at"], last["observed_at"])
+        if gap is not None and gap < min_days_between:
+            continue
+        if True:
             reversals.append(
                 Reversal(
                     author=author,
@@ -307,3 +328,19 @@ def render_for_dossier(db: Database, concept_id: int, *, days: int = 120) -> str
         parts.append("")
 
     return "\n".join(parts)
+
+
+def _gap_days(first: Any, last: Any) -> float | None:
+    """Days between two observations, or None if either date is unusable."""
+    a, b = _parse(str(first or "")), _parse(str(last or ""))
+    if a is None or b is None:
+        return None
+    return abs((b - a).total_seconds()) / 86400
+
+
+def _parse(value: str) -> datetime | None:
+    try:
+        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    except (ValueError, AttributeError):
+        return None
