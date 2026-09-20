@@ -307,3 +307,19 @@ def test_same_week_stance_flip_is_not_a_reversal(db, settings, make_source_item)
                   (now - timedelta(days=10 - i)).isoformat())
 
     assert not [r for r in contradictions.find_reversals(db) if r.author == "hasty"]
+
+
+def test_failed_extractions_are_retried_but_settled_ones_are_not(
+    db, settings, make_source_item
+):
+    """A token overrun is transient; an empty article is a settled answer."""
+    extractor = _extractor(db, settings)
+    failed = _article(db, make_source_item, ext="f1", text="a" * 900, author="w")
+    empty = _article(db, make_source_item, ext="e1", text="b" * 900, author="w")
+
+    extractor.persist(failed, None)                      # -> failed
+    extractor.persist(empty, ClaimExtractionOutput())    # -> empty
+
+    pending_ids = {r["id"] for r in extractor.pending()}
+    assert failed["id"] in pending_ids, "a failed extraction must be retried"
+    assert empty["id"] not in pending_ids, "an empty article must not be re-paid for"

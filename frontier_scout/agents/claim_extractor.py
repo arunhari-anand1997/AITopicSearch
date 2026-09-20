@@ -102,12 +102,14 @@ class ClaimExtractor:
         Ordered newest first, so an interrupted backfill has already covered the
         most editorially relevant articles.
         """
+        # 'ok' and 'empty' are settled outcomes. 'failed' is not: a timeout or
+        # a token overrun should be retried on the next pass, not written off.
         sql = (
             "SELECT s.id, s.title, s.text, s.source_name, s.published_at,"
             " s.author_id, s.source_type, s.primary_or_secondary"
             " FROM source_items s"
             " LEFT JOIN claim_extractions e ON e.source_item_id = s.id"
-            " WHERE e.source_item_id IS NULL"
+            " WHERE (e.source_item_id IS NULL OR e.status = 'failed')"
             "   AND LENGTH(COALESCE(s.text,'')) >= ?"
         )
         params: list[Any] = [min_chars]
@@ -163,7 +165,10 @@ class ClaimExtractor:
             schema=ClaimExtractionOutput,
             prompt_version=prompt_version(self.prompt_name),
             effort="low",
-            max_tokens=8000,
+            # Dense essays produce twenty-plus claims. At 8000 the model ran
+            # out of room mid-JSON and the whole article was lost -- 16 of 620
+            # on the first backfill. Headroom is far cheaper than re-reading.
+            max_tokens=16000,
             temperature=0.0,
             metadata={"role": self.role, "item": row["id"]},
         )
