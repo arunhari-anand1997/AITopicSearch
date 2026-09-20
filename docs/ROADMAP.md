@@ -174,10 +174,21 @@ accelerating" is more actionable than "X is ranked fourth today."
 - **Resumability.** A dead run can be re-run cheaply (the content-hash cache
   replays completed calls) but cannot yet skip finished stages outright.
 - **Evaluator binaries are not discriminating** — 12 of 12 candidates passed
-  both. Either the generator is genuinely good or the evaluator is
-  rubber-stamping; one run cannot distinguish these.
-- **Red team may be over-harsh** — 7 SURVIVES against 43 wounds and kills.
-  Intended posture, but worth watching.
+  both, in two consecutive runs. This is the same class of fault as the
+  title-scope attack below: a check that always returns the same answer
+  carries no information. Needs the same treatment — an explicit calibration
+  scale with worked examples of a NO.
+- ~~**Red team title-scope attack was a constant.**~~ FIXED. It returned FATAL
+  on 10 of 10 candidates across two runs, with zero WOUNDED and zero
+  SURVIVES, because it treated any gap between a general-audience title and a
+  specific finding as fatal — an unfalsifiable standard, since every such
+  title is broader than its evidence. It now separates an ASSERTION of an
+  undemonstrated fact from a QUESTION the evidence can explore. Verified
+  against controls: assertion-titles on thin evidence score FATAL 10/10,
+  the same-evidence question scores WOUNDED 5/10.
+
+  Worth remembering as a general lesson: the fix for "every candidate fails
+  this check" was to the check, not the candidates.
 
 ## Explicitly not doing
 
