@@ -54,6 +54,7 @@ DEFAULT_MODELS: dict[str, str] = {
     "evaluator": "deepseek-v4-pro",
     "pairwise": "deepseek-flash",
     "red_team": "deepseek-v4-pro",
+    "extractor": "deepseek-flash",
 }
 
 DEFAULT_TEMPERATURE: dict[str, float] = {
@@ -64,6 +65,7 @@ DEFAULT_TEMPERATURE: dict[str, float] = {
     "evaluator": 0.0,
     "pairwise": 0.0,
     "red_team": 0.2,
+    "extractor": 0.0,
 }
 
 

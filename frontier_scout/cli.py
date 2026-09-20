@@ -432,6 +432,134 @@ def ingest_cmd(path: str) -> None:
 
 
 @app.command()
+def extract(
+    limit: Optional[int] = typer.Option(None, "--limit", help="Cap articles this pass"),
+    budget: Optional[float] = typer.Option(None, "--budget", help="USD ceiling"),
+    concurrency: int = typer.Option(8, "--concurrency"),
+    min_chars: int = typer.Option(
+        400, "--min-chars", help="Skip articles shorter than this"
+    ),
+    types: Optional[str] = typer.Option(
+        None, "--types", help="Comma-separated source types, e.g. substack,arxiv"
+    ),
+) -> None:
+    """Build the claim layer: read each article once and keep what it argued.
+
+    Resumable. Each article is committed as it completes, so an interrupted
+    backfill costs one article rather than the whole run.
+    """
+    import asyncio as _asyncio
+
+    from .agents.claim_extractor import ClaimExtractor
+    from .llm.runner import AgentRunner
+
+    settings, db = _setup()
+    provider = _provider(settings)
+    if provider is None:
+        console.print("[red]claim extraction needs an LLM provider[/red]")
+        raise typer.Exit(1)
+
+    run_id = _run_id("extract")
+    db.start_run(run_id, "extract", settings.config_hash())
+    runner = AgentRunner(provider, settings, db, run_id)
+    if budget:
+        runner.budget_usd = budget
+
+    extractor = ClaimExtractor(db, runner)
+    before = extractor.coverage()
+    rows = extractor.pending(
+        limit=limit,
+        min_chars=min_chars,
+        source_types=[t.strip() for t in types.split(",")] if types else None,
+    )
+
+    console.print(
+        f"[bold]{before['extracted']}[/bold] of {before['eligible']} eligible "
+        f"articles already extracted; {len(rows)} to do this pass"
+    )
+    if not rows:
+        console.print("[green]nothing pending[/green]")
+        return
+
+    async def main() -> None:
+        sem = _asyncio.Semaphore(concurrency)
+        done = {"n": 0, "claims": 0}
+
+        async def one(row) -> None:
+            async with sem:
+                try:
+                    output = await extractor.extract_one(row)
+                except Exception as exc:  # noqa: BLE001 - one article must not kill the pass
+                    console.print(f"[dim]failed {row['id']}: {exc}[/dim]")
+                    output = None
+                claims, _positions = extractor.persist(row, output)
+                done["n"] += 1
+                done["claims"] += claims
+                if done["n"] % 25 == 0:
+                    console.print(
+                        f"  {done['n']}/{len(rows)} articles, "
+                        f"{done['claims']} claims, ${runner.stats.spend_usd:.2f}"
+                    )
+
+        await _asyncio.gather(*(one(r) for r in rows), return_exceptions=True)
+
+    with console.status("[bold]extracting claims..."):
+        try:
+            asyncio.run(main())
+        except Exception as exc:  # noqa: BLE001
+            console.print(f"[yellow]stopped early: {exc}[/yellow]")
+
+    db.finish_run(run_id)
+    after = extractor.coverage()
+    table = Table(title="Claim layer")
+    table.add_column("")
+    table.add_column("before", justify="right")
+    table.add_column("after", justify="right")
+    for key in ("extracted", "claims", "positions", "entities"):
+        table.add_row(key, str(before[key]), str(after[key]))
+    console.print(table)
+    console.print(f"[dim]cost: ${runner.stats.spend_usd:.3f} "
+                  f"over {runner.stats.calls} calls[/dim]")
+
+
+@app.command()
+def disputes(
+    days: int = typer.Option(120, "--days"),
+    limit: int = typer.Option(10, "--limit"),
+) -> None:
+    """Show disagreement computed from the claim layer. No LLM calls."""
+    from .trends import contradictions
+
+    _settings, db = _setup()
+
+    found = contradictions.find_disputes(db, days=days)
+    if not found:
+        console.print(
+            "[yellow]no disputes found[/yellow] — run "
+            "[bold]frontier-scout extract[/bold] to build the claim layer first"
+        )
+        return
+
+    console.print(f"[bold]{len(found)} concepts with opposing positions[/bold]\n")
+    for dispute in found[:limit]:
+        marker = "" if dispute.is_genuine else " [dim](one-sided)[/dim]"
+        console.print(f"[cyan]{dispute.concept_label}[/cyan]{marker}")
+        for side in dispute.sides:
+            console.print(
+                f"   {side.stance:11s} {side.author_count} authors: "
+                f"{', '.join(sorted(set(side.authors))[:4])}"
+            )
+        console.print()
+
+    reversals = contradictions.find_reversals(db)
+    if reversals:
+        console.print(f"[bold]{len(reversals)} position reversals[/bold] "
+                      "[dim](an author changing their own mind)[/dim]\n")
+        for rev in reversals[:8]:
+            console.print("  " + rev.render())
+
+
+@app.command()
 def daily(
     backfill: bool = typer.Option(False, "--backfill"),
     top: Optional[int] = typer.Option(None, "--top"),

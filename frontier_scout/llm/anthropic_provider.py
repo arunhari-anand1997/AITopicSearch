@@ -51,6 +51,7 @@ DEFAULT_EFFORT: dict[str, str] = {
     "evaluator": "medium",
     "pairwise": "medium",
     "red_team": "medium",
+    "extractor": "low",
 }
 
 DEFAULT_MODELS: dict[str, str] = {
@@ -61,6 +62,7 @@ DEFAULT_MODELS: dict[str, str] = {
     "evaluator": "claude-sonnet-5",
     "pairwise": "claude-sonnet-5",
     "red_team": "claude-sonnet-5",
+    "extractor": "claude-haiku-4-5",
 }
 
 

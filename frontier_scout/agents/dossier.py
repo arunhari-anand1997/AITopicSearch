@@ -134,6 +134,18 @@ def build_dossier(db: Database, group: ConceptGroup, *, max_items: int = 40) -> 
             lines.append(f"- {label}: {chain}")
         lines.append("")
 
+    # -- what articles actually ARGUED, from the claim layer -----------------
+    # Placed before the raw excerpts on purpose: this is the distilled position
+    # of every extracted article, where the excerpts below are a recency-ordered
+    # sample. Where the claim layer is empty (nothing extracted yet) this adds
+    # nothing and the excerpts carry the load as before.
+    from ..trends import contradictions
+
+    for concept_id in group.concept_ids[:2]:
+        rendered = contradictions.render_for_dossier(db, concept_id)
+        if rendered:
+            lines.append(rendered)
+
     # -- X, derived from citations rather than the paid API -----------------
     from ..trends import x_citations
 

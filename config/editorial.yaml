@@ -27,6 +27,7 @@ models:
   pairwise: claude-sonnet-5
   red_team: claude-sonnet-5
   clusterer: claude-opus-5
+  extractor: claude-haiku-4-5
 
 # DeepSeek model map. deepseek-flash is roughly 4x cheaper than v4-pro, so
 # high-volume extraction and the pairwise tournament run on flash while
@@ -43,6 +44,10 @@ deepseek_models:
   evaluator: deepseek-v4-pro
   pairwise: deepseek-flash
   red_team: deepseek-v4-pro
+  # Claim extraction runs once per article over thousands of articles, so it
+  # uses the cheapest model. The point of the layer is that expensive
+  # reasoning downstream reads structure instead of prose.
+  extractor: deepseek-flash
 
 # NOTE ON TEMPERATURE.
 # The original plan was "low temperature for extraction, higher for generation".
@@ -62,6 +67,7 @@ effort:
   evaluator: medium
   pairwise: medium
   red_team: medium
+  extractor: low
 
 legacy_temperature:
   # Applied on models that accept sampling parameters. DeepSeek does, so on
@@ -74,6 +80,7 @@ legacy_temperature:
   evaluator: 0.0
   pairwise: 0.0
   red_team: 0.2
+  extractor: 0.0
 
 # INSIDER_MOMENTUM component weights. Not sacred -- every component is stored
 # separately in concept_metrics so these can be refit against video outcomes.

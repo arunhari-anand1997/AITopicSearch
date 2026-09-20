@@ -31,7 +31,7 @@ from .models import (
     iso,
 )
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 SCHEMA = """
 PRAGMA journal_mode=WAL;
@@ -369,6 +369,77 @@ CREATE TABLE IF NOT EXISTS llm_calls (
   input_hash TEXT, input_tokens INTEGER, output_tokens INTEGER,
   cost_usd REAL, latency_ms INTEGER, cache_hit INTEGER,
   retry_count INTEGER, created_at TEXT);
+
+
+-- ===================================================================
+-- THE CLAIM LAYER
+--
+-- The system stores raw text (source_items) and counts (concept_metrics),
+-- but without this it never stores WHAT AN ARTICLE ARGUED. Every run would
+-- re-read prose, re-derive understanding, emit signals, and discard the
+-- understanding -- memory of counts, no memory of comprehension.
+--
+-- Extracted ONCE per article and kept forever. Two things become possible
+-- that are not otherwise:
+--   1. Disagreement becomes a QUERY across every article, instead of a model
+--      guessing over the forty excerpts that fit in a prompt.
+--   2. Self-correction becomes visible: same author, opposite stance, months
+--      apart.
+-- ===================================================================
+
+CREATE TABLE IF NOT EXISTS article_claims (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  source_item_id TEXT REFERENCES source_items(id),
+  proposition TEXT NOT NULL,          -- the assertion, normalised
+  stance TEXT NOT NULL,               -- asserts|disputes|questions|reports
+  hedging TEXT,                       -- confident|hedged|speculative
+  evidence_type TEXT,                 -- benchmark|measurement|anecdote|
+                                      -- argument|announcement|none
+  subject TEXT,                       -- free-text topic of the claim
+  concept_id INTEGER REFERENCES concepts(id),   -- resolved where possible
+  quote TEXT,                         -- supporting snippet, for provenance
+  is_surprising INTEGER DEFAULT 0,    -- contradicts conventional wisdom
+  is_self_correction INTEGER DEFAULT 0,  -- "I was wrong about..."
+  confidence REAL,
+  created_at TEXT);
+CREATE INDEX IF NOT EXISTS idx_claims_item ON article_claims(source_item_id);
+CREATE INDEX IF NOT EXISTS idx_claims_concept ON article_claims(concept_id);
+CREATE INDEX IF NOT EXISTS idx_claims_stance ON article_claims(stance);
+
+CREATE TABLE IF NOT EXISTS article_positions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  source_item_id TEXT REFERENCES source_items(id),
+  concept_id INTEGER REFERENCES concepts(id),
+  author_id INTEGER REFERENCES authors(id),
+  stance TEXT NOT NULL,               -- advocating|skeptical|neutral|reporting
+  rationale TEXT,
+  confidence REAL,
+  observed_at TEXT,                   -- the ARTICLE's date, for trajectories
+  UNIQUE(source_item_id, concept_id));
+CREATE INDEX IF NOT EXISTS idx_positions_concept ON article_positions(concept_id);
+CREATE INDEX IF NOT EXISTS idx_positions_author ON article_positions(author_id);
+
+CREATE TABLE IF NOT EXISTS article_entities (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  source_item_id TEXT REFERENCES source_items(id),
+  name TEXT NOT NULL,
+  entity_type TEXT,                   -- person|org|model|paper|product
+  role TEXT,                          -- how it appears in the article
+  UNIQUE(source_item_id, name));
+CREATE INDEX IF NOT EXISTS idx_entities_name ON article_entities(name);
+
+-- Extraction bookkeeping. A separate table rather than a NOT EXISTS check on
+-- article_claims, so that an article which genuinely yields zero claims is not
+-- re-extracted on every run forever.
+CREATE TABLE IF NOT EXISTS claim_extractions (
+  source_item_id TEXT PRIMARY KEY REFERENCES source_items(id),
+  extracted_at TEXT NOT NULL,
+  model TEXT,
+  prompt_version TEXT,
+  n_claims INTEGER DEFAULT 0,
+  n_positions INTEGER DEFAULT 0,
+  status TEXT NOT NULL,               -- ok|empty|failed
+  error TEXT);
 
 -- Empty in V1. Exists so outcome learning can attach without a migration:
 -- the point of storing every scoring component is to refit weights against
