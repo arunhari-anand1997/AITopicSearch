@@ -175,6 +175,10 @@ class DiscoveryPipeline:
         assert self.runner is not None
 
         # --- scouts, in parallel, blind to each other --------------------
+        # Each scout persists its own signals as it finishes. Collecting first
+        # and saving after the gather means a crash anywhere in the batch
+        # discards every scout that had already succeeded.
+        self.db.stage_start(self.run_id, "scouts")
         scout_jobs = []
         for group in result.groups:
             for scout_cls in ALL_SCOUTS:
@@ -184,14 +188,9 @@ class DiscoveryPipeline:
                     kwargs["youtube_block"] = coverage_blocks.get(group.key, "")
                 scout_jobs.append(self._run_scout(scout, group, kwargs))
 
-        for group_key, agent_name, output in await self.runner.gather(scout_jobs):
-            if output is None:
-                continue
-            signals = to_signals(agent_name, output, cluster_id=None)
-            for sig in signals:
-                sig.cluster_id = group_key
-                self.db.save_signal(sig, self.run_id)
-            result.signals.extend(signals)
+        for signals in await self.runner.gather(scout_jobs):
+            result.signals.extend(signals or [])
+        self.db.stage_done(self.run_id, "scouts", len(result.signals))
 
         signals_by_group: dict[str, list[Signal]] = {}
         for sig in result.signals:
@@ -200,6 +199,7 @@ class DiscoveryPipeline:
         coverage_by_group = self._coverage_saturation(result.groups, coverage_blocks)
 
         # --- cluster -> translate -> generate, per group -----------------
+        self.db.stage_start(self.run_id, "cluster_and_generate")
         cluster_jobs = [
             self._cluster_and_generate(group, signals_by_group.get(group.key, []))
             for group in result.groups
@@ -207,10 +207,8 @@ class DiscoveryPipeline:
         for group, cluster, candidates in await self.runner.gather(cluster_jobs):
             if cluster is not None:
                 result.clusters.append(cluster)
-                self.db.save_cluster(cluster, self.run_id)
-            for cand in candidates:
-                self.db.save_candidate(cand, self.run_id)
             result.candidates.extend(candidates)
+        self.db.stage_done(self.run_id, "cluster_and_generate", len(result.candidates))
 
         if not result.candidates:
             result.notes.append("no candidates were generated")
@@ -219,16 +217,17 @@ class DiscoveryPipeline:
         # --- independent evaluation --------------------------------------
         evaluator = Evaluator(self.db, self.runner)
         group_by_candidate = self._group_index(result)
+        self.db.stage_start(self.run_id, "evaluate")
         eval_jobs = [
-            evaluator.evaluate(
-                cand, trend_context=self._trend_context(group_by_candidate.get(cand.id))
+            self._evaluate_and_save(
+                evaluator, cand,
+                self._trend_context(group_by_candidate.get(cand.id)),
             )
             for cand in result.candidates
         ]
         evaluations = [e for e in await self.runner.gather(eval_jobs) if e]
-        for ev in evaluations:
-            self.db.save_evaluation(ev, self.run_id)
         result.evaluations = evaluations
+        self.db.stage_done(self.run_id, "evaluate", len(evaluations))
         eval_by_id = {e.candidate_id: e for e in evaluations}
 
         # --- opportunity scoring + the binary gate ------------------------
@@ -257,10 +256,15 @@ class DiscoveryPipeline:
         # --- pairwise tournament on the top slice -------------------------
         top_n = int(self.settings.pipeline.get("pairwise_top_n", 10))
         contenders = [row[0] for row in scored[:top_n]]
-        tournament = await PairwiseTournament(self.runner).run(contenders)
-        for pr in tournament.results:
-            self.db.save_pairwise(pr, self.run_id)
+        self.db.stage_start(self.run_id, "pairwise")
+        # The tournament persists each judgement as it lands. Saving the whole
+        # set afterwards meant a death mid-tournament discarded hundreds of
+        # completed comparisons.
+        tournament = await PairwiseTournament(self.runner).run(
+            contenders, sink=lambda pr: self.db.save_pairwise(pr, self.run_id)
+        )
         result.tournament = tournament
+        self.db.stage_done(self.run_id, "pairwise", len(tournament.results))
         rates = {cid: rate for cid, rate, _ in tournament.ranking()}
 
         # --- red team on the finalists ------------------------------------
@@ -276,12 +280,14 @@ class DiscoveryPipeline:
             )
             for cand in red_targets
         ]
+        self.db.stage_start(self.run_id, "red_team")
         findings_by_candidate: dict[str, list[RedTeamFinding]] = {}
         for findings, _summary in await self.runner.gather(attack_jobs):
             for f in findings:
                 self.db.save_red_team(f, self.run_id)
                 findings_by_candidate.setdefault(f.candidate_id, []).append(f)
             result.red_team.extend(findings)
+        self.db.stage_done(self.run_id, "red_team", len(result.red_team))
 
         # --- one revision pass --------------------------------------------
         revision_jobs = [
@@ -320,9 +326,26 @@ class DiscoveryPipeline:
 
     # -- helpers -----------------------------------------------------------
 
-    async def _run_scout(self, scout: Any, group: ConceptGroup, kwargs: dict[str, Any]):
+    async def _run_scout(
+        self, scout: Any, group: ConceptGroup, kwargs: dict[str, Any]
+    ) -> list[Signal]:
+        """Run one scout and persist its signals immediately."""
         output = await scout.run(group, **kwargs)
-        return group.key, scout.name, output
+        if output is None:
+            return []
+        signals = to_signals(scout.name, output, cluster_id=None)
+        for sig in signals:
+            sig.cluster_id = group.key
+            self.db.save_signal(sig, self.run_id)
+        return signals
+
+    async def _evaluate_and_save(
+        self, evaluator: Any, cand: CandidateVideo, trend_context: str
+    ) -> Evaluation | None:
+        evaluation = await evaluator.evaluate(cand, trend_context=trend_context)
+        if evaluation is not None:
+            self.db.save_evaluation(evaluation, self.run_id)
+        return evaluation
 
     async def _cluster_and_generate(
         self, group: ConceptGroup, signals: list[Signal]
@@ -332,6 +355,10 @@ class DiscoveryPipeline:
             group, signals=signals
         )
         cluster = to_cluster(cluster_out, group) if cluster_out else None
+        # Saved here rather than after generation: clustering is the expensive
+        # reasoning, and a generator failure should not discard it.
+        if cluster is not None:
+            self.db.save_cluster(cluster, self.run_id)
 
         translation = await Translator(self.db, self.runner).run(group, cluster=cluster_out)
         generated = await CandidateGenerator(self.db, self.runner).run(
@@ -346,6 +373,8 @@ class DiscoveryPipeline:
             to_candidate_video(g, cluster.id if cluster else None, fallback)
             for g in (generated.candidates if generated else [])
         ]
+        for cand in candidates:
+            self.db.save_candidate(cand, self.run_id)
         return group, cluster, candidates
 
     def _group_index(self, result: DiscoveryResult) -> dict[str, ConceptGroup]:

@@ -14,7 +14,7 @@ from __future__ import annotations
 import itertools
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Callable
 
 from pydantic import BaseModel, Field
 
@@ -58,8 +58,18 @@ class PairwiseTournament:
         self.runner = runner
 
     async def run(
-        self, candidates: list[CandidateVideo], *, swap_check: bool = True
+        self,
+        candidates: list[CandidateVideo],
+        *,
+        swap_check: bool = True,
+        sink: Callable[[PairwiseResult], None] | None = None,
     ) -> TournamentResult:
+        """Judge every pair on every question.
+
+        `sink` persists each judgement the moment it lands. A tournament over
+        ten candidates is hundreds of calls, and saving only at the end meant a
+        death partway through discarded every comparison already completed.
+        """
         result = TournamentResult()
         if len(candidates) < 2:
             return result
@@ -68,9 +78,9 @@ class PairwiseTournament:
         jobs: list[Any] = []
         for a, b in itertools.combinations(candidates, 2):
             for question_key in PAIRWISE_QUESTIONS:
-                jobs.append(self._judge(a, b, question_key, swapped=False))
+                jobs.append(self._judge(a, b, question_key, swapped=False, sink=sink))
                 if swap_check:
-                    jobs.append(self._judge(b, a, question_key, swapped=True))
+                    jobs.append(self._judge(b, a, question_key, swapped=True, sink=sink))
 
         for judgement in await self.runner.gather(jobs):
             if judgement is None:
@@ -83,7 +93,13 @@ class PairwiseTournament:
         return result
 
     async def _judge(
-        self, a: CandidateVideo, b: CandidateVideo, question_key: str, *, swapped: bool
+        self,
+        a: CandidateVideo,
+        b: CandidateVideo,
+        question_key: str,
+        *,
+        swapped: bool,
+        sink: Callable[[PairwiseResult], None] | None = None,
     ) -> PairwiseResult | None:
         question = PAIRWISE_QUESTIONS[question_key]
         task = (
@@ -112,7 +128,7 @@ class PairwiseTournament:
             return None
 
         winner_id = a.id if out.winner.strip().upper() == "A" else b.id
-        return PairwiseResult(
+        judgement = PairwiseResult(
             candidate_a=a.id,
             candidate_b=b.id,
             question_key=question_key,
@@ -122,3 +138,6 @@ class PairwiseTournament:
             judge_model=self.runner.provider.model_for(self.role),
             order_swapped=swapped,
         )
+        if sink is not None:
+            sink(judgement)
+        return judgement

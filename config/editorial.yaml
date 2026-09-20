@@ -6,6 +6,10 @@ pipeline:
   # Everything before the gate is free; everything after costs money.
   gate_width: 12
   max_concurrent_calls: 12
+  # Wall-clock ceiling per LLM call. Without it a single hung request stalls
+  # the whole run silently -- httpx read timeouts do not fire when a server
+  # trickles bytes.
+  call_timeout_seconds: 240
   backfill_days: 90
   daily_llm_budget_usd: 15.0
   min_mentions_to_track: 2          # below this a concept is noise

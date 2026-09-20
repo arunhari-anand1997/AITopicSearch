@@ -60,6 +60,10 @@ class AgentRunner:
         self.cache = CallCache(settings.cache_dir, enabled=use_cache)
         self.semaphore = asyncio.Semaphore(settings.max_concurrent_calls)
         self.budget_usd = settings.daily_llm_budget_usd
+        # A hung HTTP request previously stalled an entire run with no error:
+        # httpx read timeouts do not fire if a server trickles bytes, so an
+        # independent wall-clock ceiling per call is the only reliable guard.
+        self.call_timeout = float(settings.pipeline.get("call_timeout_seconds", 240))
         self.stats = RunStats()
         self._lock = asyncio.Lock()
 
@@ -141,7 +145,21 @@ class AgentRunner:
                     **{**request.__dict__, "task": task}
                 )
                 try:
-                    response = await self.provider.complete(attempt_request)
+                    response = await asyncio.wait_for(
+                        self.provider.complete(attempt_request),
+                        timeout=self.call_timeout,
+                    )
+                except asyncio.TimeoutError:
+                    self.stats.retries += 1
+                    if attempt == max_attempts - 1:
+                        message = (
+                            f"{request.agent}: no response within "
+                            f"{self.call_timeout:.0f}s"
+                        )
+                        self.stats.failures.append(message)
+                        log.warning(message)
+                        return None
+                    continue
                 except Exception as exc:  # noqa: BLE001 - surfaced in stats
                     self.stats.retries += 1
                     if attempt == max_attempts - 1:

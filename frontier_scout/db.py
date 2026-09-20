@@ -31,7 +31,7 @@ from .models import (
     iso,
 )
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 SCHEMA = """
 PRAGMA journal_mode=WAL;
@@ -440,6 +440,19 @@ CREATE TABLE IF NOT EXISTS claim_extractions (
   n_positions INTEGER DEFAULT 0,
   status TEXT NOT NULL,               -- ok|empty|failed
   error TEXT);
+
+-- Where a run got to. A discovery run died mid-flight leaving no trace of
+-- which stage it reached; this makes that diagnosable and makes a resumed run
+-- able to skip what already finished.
+CREATE TABLE IF NOT EXISTS run_stages (
+  run_id TEXT NOT NULL,
+  stage TEXT NOT NULL,
+  status TEXT NOT NULL,              -- started|done|failed
+  items INTEGER DEFAULT 0,
+  started_at TEXT,
+  finished_at TEXT,
+  error TEXT,
+  PRIMARY KEY (run_id, stage));
 
 -- Empty in V1. Exists so outcome learning can attach without a migration:
 -- the point of storing every scoring component is to refit weights against
@@ -883,6 +896,35 @@ class Database:
                     datetime.now(timezone.utc).isoformat(),
                 ),
             )
+
+    def stage_start(self, run_id: str, stage: str) -> None:
+        with self.tx() as c:
+            c.execute(
+                "INSERT OR REPLACE INTO run_stages(run_id,stage,status,started_at)"
+                " VALUES(?,?,'started',?)",
+                (run_id, stage, datetime.now(timezone.utc).isoformat()),
+            )
+
+    def stage_done(self, run_id: str, stage: str, items: int = 0) -> None:
+        with self.tx() as c:
+            c.execute(
+                "UPDATE run_stages SET status='done', items=?, finished_at=?"
+                " WHERE run_id=? AND stage=?",
+                (items, datetime.now(timezone.utc).isoformat(), run_id, stage),
+            )
+
+    def stage_failed(self, run_id: str, stage: str, error: str) -> None:
+        with self.tx() as c:
+            c.execute(
+                "UPDATE run_stages SET status='failed', error=?, finished_at=?"
+                " WHERE run_id=? AND stage=?",
+                (error[:500], datetime.now(timezone.utc).isoformat(), run_id, stage),
+            )
+
+    def stages(self, run_id: str) -> list[sqlite3.Row]:
+        return self.conn.execute(
+            "SELECT * FROM run_stages WHERE run_id=? ORDER BY started_at", (run_id,)
+        ).fetchall()
 
     def run_cost(self, run_id: str) -> dict[str, Any]:
         row = self.conn.execute(
