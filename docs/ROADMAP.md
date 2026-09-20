@@ -41,7 +41,22 @@ Adopting the vocabulary would be relabeling. What is genuinely missing is not a
 
 ---
 
-## P1 — The claim layer
+## P1 — The claim layer — SHIPPED (2026-09-20)
+
+Built and backfilled. Measured on live data: long-form articles yield about 8
+claims each against 4.8 for short forum comments, so extraction is selective by
+source type and length rather than spending equally on an essay and a two-line
+comment. The full corpus would be ~$11; the long-form pass ~$2.60.
+
+Already surfacing what it was built for — named authors on both sides of real
+splits (multi-agent orchestration: Anthropic and Nathan Lambert skeptical
+against Ruiping Liu and Wenjie Liao advocating), a genuine public
+self-correction, and one-sided concepts correctly reported as one-sided rather
+than dressed up as balance.
+
+Two false positives found and fixed during rollout: organisational bylines were
+being read as one mind changing ("Anthropic moved from skeptical to advocating"
+across two posts a day apart), and stance flips needed a minimum time gap.
 
 **The one that unlocks the rest.**
 
@@ -148,13 +163,16 @@ accelerating" is more actionable than "X is ranked fourth today."
 
 ## Engineering debt worth clearing
 
-- **Durability of long runs.** A discovery run died mid-flight after the
-  clusterer stage and lost the work, because clusters persist only after their
-  group's generator returns and pairwise results persist only after the whole
-  tournament completes. Stages should checkpoint as they finish, and long jobs
-  should be resumable.
-- **Per-call timeouts.** A hung HTTP request can stall an entire run
-  indefinitely.
+- ~~**Durability of long runs.**~~ FIXED. Each artifact now persists the moment
+  it exists: scouts save their own signals, a cluster is saved before
+  generation is attempted, evaluations save per candidate, and the tournament
+  commits each judgement as it lands. A `run_stages` table records where a run
+  reached. Four tests pin it by failing a stage mid-flight and asserting the
+  earlier work survived.
+- ~~**Per-call timeouts.**~~ FIXED. A wall-clock ceiling per LLM call, because
+  httpx read timeouts do not fire when a server trickles bytes.
+- **Resumability.** A dead run can be re-run cheaply (the content-hash cache
+  replays completed calls) but cannot yet skip finished stages outright.
 - **Evaluator binaries are not discriminating** — 12 of 12 candidates passed
   both. Either the generator is genuinely good or the evaluator is
   rubber-stamping; one run cannot distinguish these.
